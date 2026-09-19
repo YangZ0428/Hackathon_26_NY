@@ -1,0 +1,63 @@
+[
+  {
+    "id": "mei",
+    "display_name": "Mei, 71",
+    "zip_code": "10029",
+    "age": 71,
+    "risk_categories": [
+      "older_adult",
+      "heat_sensitive_medication"
+    ],
+    "acclimatization": "low",
+    "activity": "walk_easy",
+    "activity_minutes": 30,
+    "clothing": "light",
+    "note": "A 30-minute walk her doctor asked her to take daily. Takes a blood-pressure medication that reduces heat tolerance.",
+    "synthetic": true
+  },
+  {
+    "id": "jordan",
+    "display_name": "Jordan, 28",
+    "zip_code": "10029",
+    "age": 28,
+    "risk_categories": [
+      "none"
+    ],
+    "acclimatization": "high",
+    "activity": "walk_easy",
+    "activity_minutes": 30,
+    "clothing": "light",
+    "note": "The same 30-minute walk, around the same block. No heat-related conditions or medications.",
+    "synthetic": true
+  },
+  {
+    "id": "ana",
+    "display_name": "Ana, 34",
+    "zip_code": "10029",
+    "age": 34,
+    "risk_categories": [
+      "respiratory"
+    ],
+    "acclimatization": "typical",
+    "activity": "walk_brisk",
+    "activity_minutes": 25,
+    "clothing": "standard",
+    "note": "Walks her kid to the playground. Has asthma, so the air-quality side of the trade matters more to her than the heat.",
+    "synthetic": true
+  },
+  {
+    "id": "sam",
+    "display_name": "Sam, 24",
+    "zip_code": "10029",
+    "age": 24,
+    "risk_categories": [
+      "none"
+    ],
+    "acclimatization": "high",
+    "activity": "run",
+    "activity_minutes": 40,
+    "clothing": "athletic",
+    "note": "A 40-minute run. Use this one to show that the activity itself moves the number, not just who you are.",
+    "synthetic": true
+  }
+]

@@ -1,0 +1,50 @@
+{
+  "_comment": "Plan options for the demo, all in East Harlem (ZIP 10029). NOTE THE SHAPE: a and b are the SAME TIME in different places (isolates the shade lever); a and c are the SAME PLACE at different times (isolates the timing lever). Compare 4:30pm to 7am at a different place and the attribution collapses to ~96% air temperature, because at 7am there is no sun for canopy to block -- the route looks worthless. canopy_shade is a stand-in from Street Tree Census density within 50 m; replace with a live Socrata query (tools/canopy.py TODO).",
+  "places": [
+    {
+      "id": "block",
+      "where_label": "Your block — 2nd Ave sidewalk",
+      "lat": 40.7914,
+      "lon": -73.944,
+      "canopy_shade": 0.06
+    },
+    {
+      "id": "park",
+      "where_label": "Park loop — north end, shaded path",
+      "lat": 40.7969,
+      "lon": -73.9518,
+      "canopy_shade": 0.63
+    }
+  ],
+  "slots": [
+    {
+      "id": "today_pm",
+      "hour": 16,
+      "day_offset": 0,
+      "when_label": "Today, 4:30 PM"
+    },
+    {
+      "id": "tomorrow_am",
+      "hour": 7,
+      "day_offset": 1,
+      "when_label": "Tomorrow, 7:00 AM"
+    }
+  ],
+  "options": [
+    {
+      "id": "a",
+      "place": "block",
+      "slot": "today_pm"
+    },
+    {
+      "id": "b",
+      "place": "park",
+      "slot": "today_pm"
+    },
+    {
+      "id": "c",
+      "place": "block",
+      "slot": "tomorrow_am"
+    }
+  ]
+}

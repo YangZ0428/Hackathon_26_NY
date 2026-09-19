@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.output/
+.vinxi/
+.tanstack/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Regenerable: run tools/snapshot.py to rebuild from the live APIs
+backend/fixtures/snapshot.json
+
+# OS
+.DS_Store
+
+# --------------------------------------------------------------------------
+# Hackathon datasets shared under restricted terms. The problem statement asks
+# for an open-source deliverable, so none of these may be committed. StillGo
+# needs none of them -- it runs entirely on public, keyless endpoints.
+# --------------------------------------------------------------------------
+nyc2026-dataset*/
+**/copd_generated_data.csv
+**/*pollen*county*daily*.csv
+**/fy25_*emissions*.csv
+**/sustainability_metrics_raw_data.csv
+**/CA_*sample*.csv
+
+# staging copies, superseded by frontend/
+frontend-patch/
+.writetest

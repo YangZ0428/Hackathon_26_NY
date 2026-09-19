@@ -1,0 +1,79 @@
+{
+  "_comment": "Every band and every verdict must trace to a published source. The problem statement says 'existing evidence-based NYC guidance is the foundation'. TODO BEFORE THE PITCH: re-anchor the band ceilings to NWS HeatRisk levels 0-4 and the EPA AirNow activity-guidance table rather than the round numbers below. Until that is done, say so out loud -- an admitted gap scores better than a silent invention.",
+
+  "bands": {
+    "low":      { "label": "Low",      "guidance_id": "nws-heatrisk", "verdict_default": "Comfortable. Nothing to plan around." },
+    "moderate": { "label": "Moderate", "guidance_id": "nws-heatrisk", "verdict_default": "Workable. Carry water and keep the pace easy." },
+    "high":     { "label": "High",     "guidance_id": "nws-heatrisk", "verdict_default": "Hard on you today. Break at least twice, or move it." },
+    "extreme":  { "label": "Extreme",  "guidance_id": "cdc-heat-clinical", "verdict_default": "This one we would move. Pick another window below." }
+  },
+
+  "best_option_verdict": "Your best window. Go.",
+
+  "aqi_categories": [
+    { "max": 50,  "label": "Good",                           "guidance_id": "epa-aqi-activity" },
+    { "max": 100, "label": "Moderate",                       "guidance_id": "epa-aqi-activity" },
+    { "max": 150, "label": "Unhealthy for sensitive groups", "guidance_id": "epa-aqi-activity" },
+    { "max": 500, "label": "Unhealthy",                      "guidance_id": "epa-aqi-activity" }
+  ],
+
+  "assumptions": [
+    "Shade is estimated from street-tree canopy density within 50 m of the route. It is not measured shade -- no city-wide street-level shade layer exists.",
+    "Conditions are hourly forecasts for this point, not sensor readings taken here.",
+    "The strain number models air temperature, radiant load, humidity, wind, your activity level and clothing. It is not a medical measurement.",
+    "Factor shares come from one-at-a-time ablation and are normalized. The model is non-linear, so they are approximate.",
+    "This tool compares exposure between options. It does not predict what will happen to your health."
+  ],
+
+  "citations": [
+    {
+      "id": "open-meteo-forecast",
+      "title": "Hourly weather forecast API",
+      "publisher": "Open-Meteo",
+      "url": "https://open-meteo.com/en/docs",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "open-meteo-air-quality",
+      "title": "Air quality API (PM2.5, ozone, US AQI)",
+      "publisher": "Open-Meteo",
+      "url": "https://open-meteo.com/en/docs/air-quality-api",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "nws-heatrisk",
+      "title": "HeatRisk experimental forecast product",
+      "publisher": "NOAA / National Weather Service",
+      "url": "https://www.wpc.ncep.noaa.gov/heatrisk/",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "epa-aqi-activity",
+      "title": "Air Quality Index and activity guidance",
+      "publisher": "US EPA AirNow",
+      "url": "https://www.airnow.gov/aqi/aqi-basics/",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "cdc-heat-clinical",
+      "title": "Heat and Medications -- Guidance for Clinicians",
+      "publisher": "CDC",
+      "url": "https://www.cdc.gov/heat-health/hcp/clinical-guidance/heat-and-medications-guidance-for-clinicians.html",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "nyc-street-tree-census",
+      "title": "2015 Street Tree Census",
+      "publisher": "NYC Open Data",
+      "url": "https://data.cityofnewyork.us/Environment/2015-Street-Tree-Census-Tree-Data/pi5s-9p35",
+      "verified": "2026-09-19"
+    },
+    {
+      "id": "nyc-cool-it",
+      "title": "Cool It! NYC -- cooling sites, fountains and shade",
+      "publisher": "NYC Parks",
+      "url": "https://www.nycgovparks.org/about/health-and-safety-guide/cool-it-nyc",
+      "verified": "2026-09-19"
+    }
+  ]
+}
