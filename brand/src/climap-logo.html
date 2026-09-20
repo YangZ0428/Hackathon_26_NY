@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1024px;height:1024px;overflow:hidden;background:transparent}
+.icon{position:relative;width:1024px;height:1024px;overflow:hidden;border-radius:230px;
+ background:linear-gradient(150deg,#6198C6 0%,#24689B 52%,#124A7B 100%)}
+.orb{position:absolute;border-radius:50%;filter:blur(120px)}
+.o1{left:-80px;top:-70px;width:560px;height:560px;background:#B8D5ED;opacity:.55}
+.o2{right:-110px;bottom:-120px;width:600px;height:600px;background:#0C3965;opacity:.75}
+.o3{right:130px;top:-30px;width:320px;height:320px;background:#FFFFFF;opacity:.24}
+.glass{position:absolute;inset:0;border-radius:230px;
+ background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.07));
+ backdrop-filter:blur(44px) saturate(180%);-webkit-backdrop-filter:blur(44px) saturate(180%);
+ border:3px solid rgba(255,255,255,.40);
+ box-shadow:inset 0 2px 0 rgba(255,255,255,.55)}
+.mark{position:absolute;inset:0;width:1024px;height:1024px}
+.sheen{position:absolute;inset:0;border-radius:230px;
+ background:linear-gradient(160deg,rgba(255,255,255,.32) 0%,rgba(255,255,255,0) 46%)}
+</style></head><body><div class="icon">
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+<div class="glass"></div>
+<svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+ <g transform="translate(50 51.5) scale(0.78) translate(-50 -50)"><g fill="none" stroke-linecap="round">
+<g stroke="#FFFFFF" stroke-width="2.0" opacity=".60">
+<path d="M 9.15 68.70 L 9.15 79.0"/>
+<path d="M 18.34 61.15 L 18.34 79.0"/>
+<path d="M 29.06 50.33 L 29.06 79.0"/>
+<path d="M 65.01 43.70 L 65.01 79.0"/>
+<path d="M 76.49 56.15 L 76.49 79.0"/>
+<path d="M 86.44 65.33 L 86.44 79.0"/>
+</g><g stroke="#FFFFFF" stroke-width="3.8">
+<path d="M 1.5 73.0 Q 17.0 67.0 48.0 28.0"/>
+<path d="M 52.0 28.0 Q 83.0 67.0 98.5 73.0"/>
+</g></g>
+<path d="M 39.6 79.0 L 39.6 17.0 L 41.800000000000004 13.0 L 58.199999999999996 13.0 L 60.4 17.0 L 60.4 79.0 Z" fill="#FFFFFF"/>
+<path d="M 41.90 79.00 L 41.90 50.00 A 6.80 6.80 0 0 1 45.30 44.11 A 6.80 6.80 0 0 1 48.70 50.00 L 48.70 79.00 Z" fill="#05345C"/>
+<path d="M 51.30 79.00 L 51.30 50.00 A 6.80 6.80 0 0 1 54.70 44.11 A 6.80 6.80 0 0 1 58.10 50.00 L 58.10 79.00 Z" fill="#05345C"/>
+<g fill="none" stroke-linecap="round">
+<path d="M 1 79.0 L 99 79.0" stroke="#FFFFFF" stroke-width="3.6"/>
+<path d="M 1 84.4 L 99 84.4" stroke="#FFFFFF" stroke-width="1.6" opacity=".55"/>
+</g></g>
+</svg>
+<div class="sheen"></div>
+</div></body></html>
