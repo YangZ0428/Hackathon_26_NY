@@ -1,4 +1,4 @@
-# StillGo — backend
+# Climap NYC — backend
 
 Health in Climate AI Hackathon, NYC 2026 · problem 08 *Heat, air, and your plans*
 
@@ -44,7 +44,7 @@ curl -s localhost:8000/api/compare -H 'content-type: application/json' \
 
 ```bash
 python tools/find_hot_day.py                  # 列出今夏最热的十二天
-export STILLGO_DEMO_DATE=2026-07-15           # 换成你挑的那天
+export CLIMAP_DEMO_DATE=2026-07-15           # 换成你挑的那天
 python3 -m uvicorn app.api:app --reload --port 8000
 ```
 
@@ -54,7 +54,7 @@ python3 -m uvicorn app.api:app --reload --port 8000
 
 ```bash
 python tools/snapshot.py                      # 把真实数据冻进 fixture
-STILLGO_OFFLINE=1 python3 -m uvicorn app.api:app --port 8000
+CLIMAP_OFFLINE=1 python3 -m uvicorn app.api:app --port 8000
 ```
 
 冻的是**真数据**，不是假数据。

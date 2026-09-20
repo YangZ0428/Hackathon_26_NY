@@ -8,7 +8,7 @@ family, still no API key -- so we can demo on a day that actually was hot.
 
 Then set the date you pick and restart:
 
-    export STILLGO_DEMO_DATE=2026-07-15
+    export CLIMAP_DEMO_DATE=2026-07-15
     python3 -m uvicorn app.api:app --reload --port 8000
 
 Say it out loud when presenting: "this is real observed data from July, because
@@ -59,7 +59,7 @@ def main() -> None:
 
     if rows:
         best = rows[0][0]
-        print(f"\nPick one, then:\n\n    export STILLGO_DEMO_DATE={best}\n"
+        print(f"\nPick one, then:\n\n    export CLIMAP_DEMO_DATE={best}\n"
               f"    python3 -m uvicorn app.api:app --reload --port 8000\n")
         print("The day AFTER the one you pick supplies the 'tomorrow morning'\n"
               "option, so prefer a hot day followed by a cooler one -- that is\n"

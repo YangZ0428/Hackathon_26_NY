@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   CalendarPlus,
   ChevronDown,
   Clock3,
+  Check,
   CloudSun,
   Footprints,
   Leaf,
   MapPin,
   RefreshCw,
   Send,
+  X,
 } from "lucide-react";
 
 import { Conversation, ConversationContent } from "@/components/ai-elements/conversation";
@@ -24,64 +26,137 @@ import { Button } from "@/components/ui/button";
 import {
   type CompareResponse,
   type OptionResult,
+  type PlanOption,
   type Profile,
   fetchCompare,
   fetchOptions,
   fetchProfiles,
   toneFor,
 } from "@/lib/api";
+import {
+  type ScheduleEvent,
+  DEFAULT_DAY, addPlan, clockLabel, durationLabel, freeWindows, isoAt,
+  pickWindows, totalFree,
+} from "@/lib/schedule";
+import {
+  type StoredPersona,
+  draftToProfile, hasOnboarded, hiddenPresets, hidePreset, loadPersonas,
+  loadSelected, removePersona, resetPresets, selectPersona,
+} from "@/lib/persona";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "StillGo — find the window when you can" },
+      { title: "Climap NYC — find the window when you can" },
       { name: "description", content: "Compare how much heat and air-pollution exposure a plan costs you at different times and places, using real public forecast data." },
-      { property: "og:title", content: "StillGo" },
+      { property: "og:title", content: "Climap NYC" },
       { property: "og:description", content: "You don't have to skip it. Find the window when you can." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: StillGo,
+  component: ClimapNYC,
 });
 
-// The sidebar schedule stays illustrative for now: the backend has no calendar
-// integration. Everything to its right is live.
-const schedule = [
-  { time: "9:00 AM", title: "Work", detail: "Focus time", duration: "3h" },
-  { time: "12:00 PM", title: "Lunch", detail: "Café with Nina", duration: "1h" },
-  { time: "2:00 PM", title: "Meeting", detail: "Project check-in", duration: "1h" },
-  { time: "4:30 PM", title: "Free", detail: "Open until dinner", duration: "1h 30m", free: true },
-  { time: "7:00 PM", title: "Dinner", detail: "At home", duration: "1h" },
-];
+/** Build the three options out of the day's free windows and the two places.
+ *
+ *  Same 2x2 shape as before -- two options share a time and differ in tree
+ *  cover, two share a place and differ in time -- so the attribution chart
+ *  stays readable. What changed is where the times come from: the gaps in this
+ *  person's day, not a fixed pair of hours in a data file.
+ */
+function buildOptions(
+  places: PlanOption[], events: ScheduleEvent[], minutes: number, date: string,
+): PlanOption[] {
+  const street = places.find((place) => place.canopy_shade < 0.3);
+  const shaded = places.find((place) => place.canopy_shade >= 0.3);
+  if (!street || !shaded || !date) return [];
 
-function StillGo() {
+  const { baseline, alternative } = pickWindows(freeWindows(events, minutes), minutes);
+  if (baseline === null) return [];
+
+  const at = (place: PlanOption, start: number, id: string): PlanOption => ({
+    ...place, id,
+    when_iso: isoAt(date, start),
+    when_label: `Today, ${clockLabel(start)}`,
+  });
+
+  const options = [at(street, baseline, "a"), at(shaded, baseline, "b")];
+  if (alternative !== null) options.push(at(street, alternative, "c"));
+  return options;
+}
+
+function ClimapNYC() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileId, setProfileId] = useState<string>("mei");
-  const [optionIds, setOptionIds] = useState<string[]>([]);
+  // People built on /profile. They sit alongside the presets, override them
+  // when one is selected, and carry a geocoded address so the weather call
+  // uses those coordinates rather than the demo ones.
+  const navigate = useNavigate();
+  const [hidden, setHidden] = useState<string[]>(() => hiddenPresets());
+  const [personas, setPersonas] = useState<StoredPersona[]>(() => loadPersonas());
+  const [selectedUid, setSelectedUid] = useState<string | null>(() => loadSelected());
+  const custom = personas.find((person) => person.uid === selectedUid) ?? null;
+  const [places, setPlaces] = useState<PlanOption[]>([]);
+  const [demoDate, setDemoDate] = useState("");
+  const [events, setEvents] = useState<ScheduleEvent[]>(DEFAULT_DAY);
+  const [added, setAdded] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | undefined>(undefined);
   const [data, setData] = useState<CompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // First visit starts at the profile form. Both buttons there mark onboarding
+  // done, so "Skip for now" genuinely skips instead of bouncing back here.
+  useEffect(() => {
+    if (!hasOnboarded()) navigate({ to: "/profile" });
+  }, [navigate]);
 
   // Load the catalogue once.
   useEffect(() => {
     Promise.all([fetchProfiles(), fetchOptions()])
       .then(([people, options]) => {
         setProfiles(people);
-        setOptionIds(options.map((option) => option.id));
+        // We reuse the catalogue's places (coordinates, canopy) but replace its
+        // times. Its first entry also tells us which day the backend is pinned
+        // to, which is the only way the browser can know about
+        // CLIMAP_DEMO_DATE.
+        setPlaces(options);
+        setDemoDate(options[0]?.when_iso.slice(0, 10) ?? "");
       })
       .catch((cause: Error) => setError(cause.message));
   }, []);
 
-  // Re-compare whenever the person or the focused option changes.
+  // How long the plan takes decides which gaps in the day are usable at all.
+  const minutes = custom ? draftToProfile(custom).activity_minutes
+    : profiles.find((person) => person.id === profileId)?.activity_minutes ?? 30;
+
+  const windows = useMemo(() => freeWindows(events, minutes), [events, minutes]);
+  const options = useMemo(
+    () => buildOptions(places, events, minutes, demoDate),
+    [places, events, minutes, demoDate],
+  );
+  // Serialised so the effect below re-runs on a real change of times, not on
+  // every render that rebuilds an equivalent array.
+  const optionsKey = JSON.stringify(options);
+
+  // Re-compare when the person, the day, or the focused option changes.
   useEffect(() => {
-    if (optionIds.length < 2) return;
+    const current: PlanOption[] = JSON.parse(optionsKey);
+    if (current.length < 2) { setData(null); setLoading(false); return; }
     setLoading(true);
     fetchCompare({
-      profileId,
-      optionIds,
-      baselineOptionId: optionIds[0],
+      ...(custom
+        ? {
+            profile: draftToProfile(custom),
+            location: custom.lat !== null && custom.lon !== null
+              ? { label: custom.address, lat: custom.lat, lon: custom.lon, zip_code: custom.zip }
+              : undefined,
+          }
+        : { profileId }),
+      options: current,
+      optionIds: current.map((option) => option.id),
+      baselineOptionId: current[0]!.id,
       focusOptionId: focusId,
     })
       .then((response) => {
@@ -90,10 +165,23 @@ function StillGo() {
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setLoading(false));
-  }, [profileId, optionIds, focusId]);
+  }, [profileId, custom, optionsKey, focusId]);
+
+  /** Book an option: it becomes a commitment, that window closes, and the
+   *  remaining options are recomputed against the day as it now stands. */
+  const bookOption = (option: OptionResult) => {
+    const source = options.find((candidate) => candidate.id === option.id);
+    if (!source) return;
+    const start = Number(source.when_iso.slice(11, 13)) * 60
+      + Number(source.when_iso.slice(14, 16));
+    setEvents((previous) => addPlan(
+      previous, start, minutes, plainActivity(data?.profile), option.where_label));
+    setAdded(option.id);
+    setFocusId(undefined);
+  };
 
   const best = data?.options.reduce(
-    (lowest, option) => (option.strain.score < lowest.strain.score ? option : lowest),
+    (lowest, option) => (option.strain.score < lowest!.strain.score ? option : lowest),
     data.options[0],
   );
   const baseline = data?.options.find((option) => option.id === data.baseline_option_id);
@@ -102,9 +190,9 @@ function StillGo() {
     <div className="min-h-dvh bg-canvas text-foreground">
       <header className="border-b border-border bg-background">
         <div className="mx-auto grid h-16 max-w-[1560px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:flex lg:px-8">
-          <a href="#main" className="flex min-w-0 items-center gap-2.5" aria-label="StillGo home">
+          <a href="#main" className="flex min-w-0 items-center gap-2.5" aria-label="Climap NYC home">
             <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><Leaf className="size-5" /></span>
-            <span className="truncate text-lg font-bold">StillGo</span>
+            <span className="truncate text-lg font-bold">Climap NYC</span>
           </a>
           <nav className="order-3 col-span-2 flex items-center gap-1 border-t border-border py-2 lg:order-none lg:col-span-1 lg:ml-8 lg:border-0 lg:py-0" aria-label="Main navigation">
             <Button variant="ghost" className="h-9 rounded-lg bg-secondary px-4 font-semibold text-foreground">Today</Button>
@@ -115,14 +203,16 @@ function StillGo() {
             {data && <DataBadge data={data} />}
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold">{data?.profile.display_name ?? "—"}</p>
-              <p className="text-xs text-muted-foreground">ZIP {data?.profile.zip_code ?? "—"} · New York</p>
+              <p className="max-w-[16rem] truncate text-xs text-muted-foreground">
+                {custom?.address || `ZIP ${data?.profile.zip_code ?? "—"} · New York`}
+              </p>
             </div>
           </div>
         </div>
       </header>
 
       <main id="main" className="mx-auto grid max-w-[1560px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-[250px_minmax(500px,1fr)_270px] lg:px-8 lg:py-7 xl:grid-cols-[270px_minmax(620px,1fr)_290px]">
-        {/* ------------------------------------------------ schedule (static) */}
+        {/* ------------------------------ schedule: the source of the options */}
         <aside className="order-2 rounded-xl border border-border bg-background p-5 shadow-panel lg:order-1 lg:self-start" aria-labelledby="schedule-title">
           <div className="mb-5 flex items-start justify-between gap-3">
             <div>
@@ -132,22 +222,42 @@ function StillGo() {
             <Button variant="outline" size="sm" className="shrink-0 rounded-lg shadow-none"><RefreshCw /> Sync</Button>
           </div>
           <div className="relative space-y-1 before:absolute before:bottom-6 before:left-[4.35rem] before:top-6 before:w-px before:bg-border">
-            {schedule.map((event) => (
-              <div key={event.time} className="grid grid-cols-[3.65rem_1rem_minmax(0,1fr)] gap-3 py-3">
-                <time className="pt-0.5 text-xs font-semibold text-muted-foreground">{event.time}</time>
-                <span className={`relative z-10 mt-1 size-3 rounded-full ring-4 ring-background ${event.free ? "bg-good" : "bg-schedule"}`} />
-                <div className={event.free ? "rounded-lg border border-good-border bg-good-soft px-3 py-2 -mt-2" : "min-w-0"}>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className={`truncate text-sm font-bold ${event.free ? "text-good-strong" : ""}`}>{event.title}</h3>
-                    <span className="text-xs text-muted-foreground">{event.duration}</span>
+            {events.map((event) => {
+              const booked = event.kind === "plan";
+              return (
+                <div key={event.id} className="grid grid-cols-[3.65rem_1rem_minmax(0,1fr)] gap-3 py-3">
+                  <time className="pt-0.5 text-xs font-semibold text-muted-foreground">{clockLabel(event.start)}</time>
+                  <span className={`relative z-10 mt-1 size-3 rounded-full ring-4 ring-background ${booked ? "bg-good" : "bg-schedule"}`} />
+                  <div className={booked ? "-mt-2 rounded-lg border border-good-border bg-good-soft px-3 py-2" : "min-w-0"}>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className={`truncate text-sm font-bold ${booked ? "text-good-strong" : ""}`}>{event.title}</h3>
+                      <span className="text-xs text-muted-foreground">{durationLabel(event.end - event.start)}</span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{event.detail}</p>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{event.detail}</p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <div className="mt-4 rounded-lg bg-secondary px-4 py-3">
-            <p className="flex items-center gap-2 text-sm font-semibold"><Clock3 className="size-4 text-primary" /> 1h 30m free today</p>
+          <div className="mt-4 space-y-2 rounded-lg bg-secondary px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <Clock3 className="size-4 text-primary" /> {durationLabel(totalFree(windows))} free today
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {windows.length
+                ? `The windows below come from these gaps: ${windows
+                    .map((w) => `${clockLabel(w.start)}–${clockLabel(w.end)}`).join(", ")}.`
+                : "No gap today is long enough for this plan."}
+            </p>
+            {events.some((event) => event.kind === "plan") && (
+              <button
+                type="button"
+                className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                onClick={() => { setEvents(DEFAULT_DAY); setAdded(null); setFocusId(undefined); }}
+              >
+                Reset the day
+              </button>
+            )}
           </div>
         </aside>
 
@@ -162,18 +272,105 @@ function StillGo() {
               Same plan, different times and places. Here is what each one costs you.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              {profiles.map((person) => (
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {personas.map((person) => {
+                const active = person.uid === selectedUid;
+                const name = draftToProfile(person).display_name;
+                return (
+                  <span
+                    key={person.uid}
+                    className={`inline-flex h-8 items-center rounded-full border text-sm font-semibold transition-colors ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="py-1 pl-3.5 pr-1.5"
+                      onClick={() => {
+                        selectPersona(person.uid);
+                        setSelectedUid(person.uid);
+                        setFocusId(undefined);
+                      }}
+                    >
+                      {name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${name}`}
+                      title={`Delete ${name}`}
+                      className={`grid h-full place-items-center rounded-r-full pl-0.5 pr-2.5 ${
+                        active ? "hover:bg-primary-foreground/20" : "hover:bg-border"
+                      }`}
+                      onClick={() => {
+                        const left = removePersona(person.uid);
+                        setPersonas(left);
+                        setSelectedUid(loadSelected());
+                        setFocusId(undefined);
+                      }}
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </span>
+                );
+              })}
+              {profiles.filter((person) => !hidden.includes(person.id)).map((person) => {
+                const active = !custom && person.id === profileId;
+                return (
+                  <span
+                    key={person.id}
+                    className={`inline-flex h-8 items-center rounded-full border text-sm font-semibold transition-colors ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="py-1 pl-3.5 pr-1.5"
+                      onClick={() => {
+                        selectPersona(null); setSelectedUid(null);
+                        setProfileId(person.id); setFocusId(undefined);
+                      }}
+                    >
+                      {person.display_name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Hide ${person.display_name}`}
+                      title="Hide from this list. The preset itself is untouched — use Reset to bring it back."
+                      className={`grid h-full place-items-center rounded-r-full pl-0.5 pr-2.5 ${
+                        active ? "hover:bg-primary-foreground/20" : "hover:bg-border"
+                      }`}
+                      onClick={() => {
+                        const next = hidePreset(person.id);
+                        setHidden(next);
+                        if (active) {
+                          const remaining = profiles.find(
+                            (other) => !next.includes(other.id) && other.id !== person.id);
+                          if (remaining) setProfileId(remaining.id);
+                        }
+                        setFocusId(undefined);
+                      }}
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </span>
+                );
+              })}
+              {hidden.length > 0 && (
                 <Button
-                  key={person.id}
-                  variant={person.id === profileId ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-full font-semibold shadow-none"
-                  onClick={() => { setProfileId(person.id); setFocusId(undefined); }}
+                  variant="ghost" size="sm"
+                  className="rounded-full font-semibold text-muted-foreground"
+                  onClick={() => setHidden(resetPresets())}
                 >
-                  {person.display_name}
+                  Reset people
                 </Button>
-              ))}
+              )}
+              <Button asChild variant="ghost" size="sm" className="rounded-full font-semibold text-muted-foreground">
+                <Link to="/profile">+ Build one</Link>
+              </Button>
             </div>
           </div>
 
@@ -199,7 +396,7 @@ function StillGo() {
               <Message from="assistant" className="max-w-full">
                 <div className="flex items-center gap-2">
                   <span className="grid size-8 place-items-center rounded-lg bg-agent text-agent-foreground"><Leaf className="size-4" /></span>
-                  <p className="text-sm font-bold">StillGo</p>
+                  <p className="text-sm font-bold">Climap NYC</p>
                 </div>
                 <MessageContent className="w-full text-[15px] leading-relaxed">
                   <MessageResponse>
@@ -218,7 +415,9 @@ function StillGo() {
                       option={option}
                       isBaseline={option.id === data.baseline_option_id}
                       isFocused={option.id === (focusId ?? best?.id)}
+                      isBooked={added === option.id}
                       onSelect={() => setFocusId(option.id)}
+                      onBook={() => bookOption(option)}
                     />
                   ))}
                 </div>
@@ -349,41 +548,66 @@ function StillGo() {
 const FACTOR_COLOURS = ["#B45B36", "#C79338", "#6F9C82", "#7C93A8", "#8A7CA8"];
 
 function OptionCard({
-  option, isBaseline, isFocused, onSelect,
-}: { option: OptionResult; isBaseline: boolean; isFocused: boolean; onSelect: () => void }) {
+  option, isBaseline, isFocused, isBooked, onSelect, onBook,
+}: {
+  option: OptionResult;
+  isBaseline: boolean;
+  isFocused: boolean;
+  isBooked: boolean;
+  onSelect: () => void;
+  onBook: () => void;
+}) {
   const tone = toneFor(option.strain.band);
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={isFocused}
-      className={`flex min-h-52 flex-col rounded-xl border bg-card p-4 text-left shadow-card transition ${
+    // A div, not a button: "Add to calendar" is a second action inside the
+    // card and nesting one button in another is invalid markup.
+    <div
+      className={`flex min-h-52 flex-col rounded-xl border bg-card text-left shadow-card transition ${
         isFocused ? "border-primary ring-1 ring-primary" : "border-border hover:border-muted-foreground/40"
       }`}
     >
-      <span className="grid size-9 place-items-center rounded-lg bg-secondary text-primary"><Footprints className="size-5" /></span>
-      <h3 className="mt-3 text-base font-bold">{option.when_label}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{option.where_label}</p>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={isFocused}
+        className="flex flex-1 flex-col p-4 text-left"
+      >
+        <span className="grid size-9 place-items-center rounded-lg bg-secondary text-primary"><Footprints className="size-5" /></span>
+        <h3 className="mt-3 text-base font-bold">{option.when_label}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{option.where_label}</p>
 
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tabular-nums">{option.strain.score}</span>
-        <span className="text-xs font-semibold text-muted-foreground">{option.strain.band_label}</span>
-      </div>
-      <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-        {isBaseline ? "your original plan" : `${option.delta_vs_baseline_pct}% strain`}
-      </p>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-3xl font-bold tabular-nums">{option.strain.score}</span>
+          <span className="text-xs font-semibold text-muted-foreground">{option.strain.band_label}</span>
+        </div>
+        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+          {isBaseline ? "your original plan" : `${option.delta_vs_baseline_pct}% strain`}
+        </p>
 
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
-        <span className={`block h-full rounded-full ${tone === "good" ? "bg-good" : "bg-warm"}`} style={{ width: `${option.strain.score}%` }} />
-      </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
+          <span className={`block h-full rounded-full ${tone === "good" ? "bg-good" : "bg-warm"}`} style={{ width: `${option.strain.score}%` }} />
+        </div>
 
-      <p className={`mt-3 text-xs font-bold ${tone === "good" ? "text-good-strong" : "text-warm-strong"}`}>
-        {option.verdict.text}
-      </p>
-      <span className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg border border-border pt-2 text-xs font-semibold">
-        <CalendarPlus className="size-3.5" /> Add to calendar
-      </span>
-    </button>
+        <p className={`mt-3 text-xs font-bold ${tone === "good" ? "text-good-strong" : "text-warm-strong"}`}>
+          {option.verdict.text}
+        </p>
+      </button>
+
+      <button
+        type="button"
+        onClick={onBook}
+        disabled={isBooked}
+        className={`m-4 mt-0 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-semibold transition ${
+          isBooked
+            ? "border-good-border bg-good-soft text-good-strong"
+            : "border-border hover:bg-secondary"
+        }`}
+      >
+        {isBooked
+          ? <><Check className="size-3.5" /> On your schedule</>
+          : <><CalendarPlus className="size-3.5" /> Add to calendar</>}
+      </button>
+    </div>
   );
 }
 
@@ -445,5 +669,5 @@ function humanRisk(key: string): string {
 
 function initials(name?: string): string {
   if (!name) return "—";
-  return name.split(/[\s,]+/)[0].slice(0, 2).toUpperCase();
+  return (name.split(/[\s,]+/)[0] ?? name).slice(0, 2).toUpperCase();
 }

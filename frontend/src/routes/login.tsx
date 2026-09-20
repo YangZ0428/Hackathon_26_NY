@@ -17,10 +17,10 @@ const highlights = [
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — ClimatePlan" },
-      { name: "description", content: "Sign in or create a ClimatePlan account to plan your free time around your schedule and today's conditions." },
-      { property: "og:title", content: "Sign in — ClimatePlan" },
-      { property: "og:description", content: "Sign in or create a ClimatePlan account to start planning your free time." },
+      { title: "Sign in — Climap NYC" },
+      { name: "description", content: "Sign in or create a Climap NYC account to plan your free time around your schedule and today's conditions." },
+      { property: "og:title", content: "Sign in — Climap NYC" },
+      { property: "og:description", content: "Sign in or create a Climap NYC account to start planning your free time." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -41,13 +41,13 @@ function LoginPage() {
 
         <div className="relative flex items-center gap-2.5 text-white">
           <span className="grid size-9 place-items-center rounded-xl bg-white/90 text-primary"><Leaf className="size-5" /></span>
-          <span className="text-lg font-bold">ClimatePlan</span>
+          <span className="text-lg font-bold">Climap NYC</span>
         </div>
 
         <div className="relative max-w-sm text-white">
           <h2 className="text-3xl font-bold leading-tight drop-shadow-sm">Plan your free time with a little help.</h2>
           <p className="mt-3 text-base leading-relaxed text-white/85">
-            ClimatePlan looks at your schedule, your location, and today's conditions, then suggests something that actually fits.
+            Climap NYC looks at your schedule, your location, and today's conditions, then suggests something that actually fits.
           </p>
           <ul className="mt-6 space-y-3">
             {highlights.map(({ icon: Icon, text }) => (
@@ -66,7 +66,7 @@ function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground"><Leaf className="size-5" /></span>
-            <span className="text-lg font-bold">ClimatePlan</span>
+            <span className="text-lg font-bold">Climap NYC</span>
           </div>
 
           <h1 className="text-3xl font-bold">{isSignUp ? "Create your account" : "Welcome back"}</h1>

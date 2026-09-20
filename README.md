@@ -1,4 +1,4 @@
-# StillGo
+# Climap NYC
 
 **You don't have to skip it. Find the window when you can.**
 
@@ -9,13 +9,13 @@ NYC 2026 — problem 08, *Heat, air, and your plans* (NYU Department of Mental H
 
 ## What it does
 
-Someone has already decided to go outside. StillGo shows them the same plan at
+Someone has already decided to go outside. Climap NYC shows them the same plan at
 different times and places, what each version costs them in heat and air-pollution
 exposure, and where that difference comes from.
 
 It does **not** tell people to stay indoors. Outdoor activity is protective for
 mental health; a tool that discourages it works against the partner's own mission.
-StillGo finds the window when you still can.
+Climap NYC finds the window when you still can.
 
 ```
 Mei, 71 — on a blood-pressure medication that reduces heat tolerance
@@ -110,7 +110,7 @@ that was:
 
 ```bash
 python tools/find_hot_day.py        # lists the real hottest days this summer
-export STILLGO_DEMO_DATE=2026-07-03 # 39.2 °C / 103 °F, observed
+export CLIMAP_DEMO_DATE=2026-07-03 # 39.2 °C / 103 °F, observed
 ```
 
 The page labels the date so nobody mistakes it for today.

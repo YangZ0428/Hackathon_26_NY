@@ -1,16 +1,16 @@
 /**
- * StillGo backend client.
+ * Climap NYC backend client.
  *
  * Start the API first:
  *   cd backend && source .venv/bin/activate
- *   export STILLGO_DEMO_DATE=2026-07-03
+ *   export CLIMAP_DEMO_DATE=2026-07-03
  *   python3 -m uvicorn app.api:app --reload --port 8000
  *
  * The backend allows any origin, so no Vite proxy is needed.
  * Interactive contract: http://localhost:8000/docs
  */
 
-const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+const BASE = import.meta.env["VITE_API_BASE"] ?? "http://localhost:8000";
 
 // ---------------------------------------------------------------- types
 export type Band = "low" | "moderate" | "high" | "extreme";
@@ -37,6 +37,28 @@ export type PlanOption = {
   lat: number;
   lon: number;
   canopy_shade: number;
+};
+
+export type GeoLocation = {
+  label: string;
+  lat: number;
+  lon: number;
+  zip_code: string;
+};
+
+export type GeocodeResult = {
+  matches: Array<GeoLocation & { full_label: string }>;
+  requested_url: string | null;
+  /** Which geocoder answered: "photon" or "census" (both street level), or
+   *  "open-meteo" (neighbourhood level last resort). */
+  provider: string | null;
+  /** Every provider tried, in order, with what it returned. For debugging a
+   *  lookup that came back empty. */
+  attempts?: Array<{ provider: string; url: string | null; found: number; problem: string | null }>;
+  /** Non-null when BOTH geocoders failed. Surfaced in the UI rather than
+   *  swallowed, so "no results" is never confused with "provider is down". */
+  problem: string | null;
+  coverage_note: string;
 };
 
 export type Conditions = {
@@ -120,18 +142,36 @@ export const fetchProfiles = () => get<Profile[]>("/api/profiles");
 export const fetchOptions = () => get<PlanOption[]>("/api/options");
 export const fetchCitation = (id: string) => get<Citation>(`/api/citations/${id}`);
 
+/** Address -> coordinates. Keyless (Nominatim), and New York City only:
+ *  canopy cover comes from the NYC Street Tree Census, so an address outside
+ *  the city would get real weather attached to invented tree data. */
+export const fetchGeocode = (q: string) =>
+  get<GeocodeResult>(`/api/geocode?q=${encodeURIComponent(q)}`);
+
 export async function fetchCompare(args: {
-  profileId: string;
+  /** A preset persona. Ignored when `profile` is given. */
+  profileId?: string | undefined;
+  /** A persona built in the form. Wins over profileId. */
+  profile?: Profile | undefined;
+  /** A geocoded address. Every option is then evaluated at these coordinates,
+   *  which is what makes the address on screen match `requested_urls`. */
+  location?: GeoLocation | undefined;
   optionIds: string[];
+  /** Plan options built by the caller -- times taken from the user's free
+   *  windows rather than the fixed slots in the backend's places.json. */
+  options?: PlanOption[] | undefined;
   baselineOptionId: string;
-  focusOptionId?: string;
+  focusOptionId?: string | undefined;
 }): Promise<CompareResponse> {
   const response = await fetch(`${BASE}/api/compare`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       profile_id: args.profileId,
+      profile: args.profile,
+      location: args.location,
       option_ids: args.optionIds,
+      options: args.options,
       baseline_option_id: args.baselineOptionId,
       focus_option_id: args.focusOptionId,
     }),

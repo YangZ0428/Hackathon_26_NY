@@ -17,7 +17,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import content, weather
+from . import content, geo, weather
 from .explain import decompose
 from .heat import StrainInputs, band_for, mean_radiant_temp, operative_temp, score
 from .schemas import (
@@ -25,7 +25,7 @@ from .schemas import (
     OptionResult, PlanOption, Profile, Resource, Strain, Tradeoff, Verdict,
 )
 
-app = FastAPI(title="StillGo API", version="0.1.0")
+app = FastAPI(title="Climap NYC API", version="0.1.0")
 
 # Wide open on purpose: hackathon, and Vite picks whatever port it likes.
 app.add_middleware(
@@ -78,8 +78,24 @@ def _tradeoff(baseline: OptionResult, best: OptionResult, profile: dict) -> Trad
     )
 
 
-def _resources(option: PlanOption) -> list[Resource]:
-    """TODO: replace with a live Cool It NYC lookup near option.lat/lon."""
+def _resources(option: PlanOption, custom_location: bool = False) -> list[Resource]:
+    """TODO: replace with a live Cool It NYC lookup near option.lat/lon.
+
+    The named places below are hand-picked around the default East Harlem demo
+    location. If the user geocoded their own address we do not know what is near
+    it, so we drop the distances rather than quote a walk time to a library that
+    may be five miles away. Citywide guidance still applies.
+    """
+    if custom_location:
+        return [
+            Resource(name="NYC cooling centers — find the nearest open site",
+                     kind="cooling_site", distance_label="citywide finder",
+                     url="https://www.nyc.gov/site/coolingcenters"),
+            Resource(name="NYC Health: extreme heat and your health",
+                     kind="guidance", distance_label="read",
+                     url="https://www.nyc.gov/site/doh/health/emergency-preparedness/"
+                         "emergencies-extreme-weather-heat.page"),
+        ]
     if option.canopy_shade > 0.4:
         return [
             Resource(name="Drinking fountain — park entrance at E 110th St",
@@ -99,6 +115,19 @@ def _resources(option: PlanOption) -> list[Resource]:
                  url="https://www.nyc.gov/site/doh/health/emergency-preparedness/"
                      "emergencies-extreme-weather-heat.page"),
     ]
+
+
+@app.on_event("startup")
+def _announce():
+    """Say out loud which day we are pinned to.
+
+    Forgetting to export the demo date means the API quietly serves today's
+    real forecast. In September that is a mild day, every option lands in the
+    Low band, and it looks like the model is broken rather than the weather
+    being pleasant. One line in the terminal removes that whole class of panic.
+    """
+    pinned = weather.demo_date()
+    print(f"  Climap NYC: {'pinned to real observations for ' + pinned if pinned else 'LIVE FORECAST (no demo date set -- export CLIMAP_DEMO_DATE=2026-07-03 for the hot day)'}")
 
 
 # --- endpoints --------------------------------------------------------------
@@ -125,14 +154,38 @@ def citation(citation_id: str):
     return Citation(**found)
 
 
+@app.get("/api/geocode")
+def geocode(q: str):
+    """Address -> coordinates, keyless, New York City only.
+
+    `requested_url` is returned for the same reason compare returns one: so the
+    claim "we really called their public API" is checkable rather than asserted.
+    """
+    note = content.GUIDANCE.get("coverage_note", "")
+    if len(q.strip()) < 3:
+        return {"matches": [], "requested_url": None, "provider": None,
+                "problem": None, "coverage_note": note}
+    result = geo.search(q.strip())
+    return {**result, "coverage_note": note}
+
+
 @app.post("/api/compare", response_model=CompareResponse)
 def compare(request: CompareRequest):
     weather.reset_call_log()
-    profile = content.PROFILES.get(request.profile_id)
-    if not profile:
-        raise HTTPException(404, f"No profile with id {request.profile_id!r}")
 
-    catalogue = {o.id: o for o in content.plan_options()}
+    # A profile built in the UI wins over a preset id. Both are synthetic: the
+    # form is a persona builder for the demo, not an intake form.
+    if request.profile:
+        profile = request.profile.model_dump()
+    else:
+        profile = content.PROFILES.get(request.profile_id)
+        if not profile:
+            raise HTTPException(404, f"No profile with id {request.profile_id!r}")
+
+    # Caller-supplied options win: the frontend derives them from free windows
+    # in the user's day, which places.json cannot know about. It has already
+    # applied the geocoded location to them, so no override is needed here.
+    catalogue = {o.id: o for o in (request.options or content.plan_options(request.location))}
     unknown = [i for i in request.option_ids if i not in catalogue]
     if unknown:
         raise HTTPException(404, f"Unknown option ids: {unknown}")
@@ -212,7 +265,7 @@ def compare(request: CompareRequest):
         options=results,
         attribution=attribution,
         tradeoff=_tradeoff(baseline, best, profile),
-        resources=_resources(catalogue[focus_id]),
+        resources=_resources(catalogue[focus_id], custom_location=request.location is not None),
         assumptions=content.GUIDANCE["assumptions"],
         citations=[Citation(**c) for c in content.GUIDANCE["citations"]],
         data_mode=weather.mode(),

@@ -40,7 +40,7 @@ ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 ALERTS_URL = "https://api.weather.gov/alerts/active"
 
-NWS_HEADERS = {"User-Agent": "(StillGo hackathon prototype, contact@example.org)"}
+NWS_HEADERS = {"User-Agent": "(ClimapNYC hackathon prototype, contact@example.org)"}
 
 WEATHER_FIELDS = [
     "temperature_2m", "relative_humidity_2m", "apparent_temperature",
@@ -66,15 +66,25 @@ def reset_call_log() -> None:
     _called_urls.clear()
 
 
+def _offline() -> bool:
+    """Old STILLGO_OFFLINE still honoured -- see the note in demo_date()."""
+    return "1" in (os.environ.get("CLIMAP_OFFLINE", ""),
+                   os.environ.get("STILLGO_OFFLINE", ""))
+
+
 def demo_date() -> Optional[str]:
-    """STILLGO_DEMO_DATE=2026-07-15 pins the whole demo to a real past day.
+    """CLIMAP_DEMO_DATE=2026-07-15 pins the whole demo to a real past day.
 
     Today may simply not be hot, and a mild day makes the comparison flat. The
     archive API serves real observations for a past date -- same public
     endpoint family, still no key. Unset it and everything runs on live
     forecasts again. tools/find_hot_day.py finds candidate dates.
     """
-    value = os.environ.get("STILLGO_DEMO_DATE", "").strip()
+    # STILLGO_* was the name before the project was renamed. Still accepted, so
+    # a command pasted from an older terminal does not silently fall back to
+    # today's mild weather and make the whole demo look broken.
+    value = (os.environ.get("CLIMAP_DEMO_DATE")
+             or os.environ.get("STILLGO_DEMO_DATE") or "").strip()
     return value or None
 
 
@@ -140,7 +150,7 @@ def series_for(lat: float, lon: float) -> dict:
     """Full hourly series for one point. Walks the three modes in order."""
     global _mode
 
-    if os.environ.get("STILLGO_OFFLINE") == "1":
+    if _offline():
         _mode = "offline_fixture"
         return _read_fixture().get(_point_key(lat, lon), {})
 
@@ -218,7 +228,7 @@ def at_hour(lat: float, lon: float, when_iso: str) -> dict[str, Any]:
 
 def alert_for(lat: float, lon: float) -> Optional[str]:
     """Official NWS alert headline, if one is active. Never blocks a response."""
-    if os.environ.get("STILLGO_OFFLINE") == "1":
+    if _offline():
         return None
     try:
         with httpx.Client(timeout=5.0, headers=NWS_HEADERS) as client:

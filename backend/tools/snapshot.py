@@ -3,7 +3,7 @@
     python tools/snapshot.py
 
 Fetches every option's point series once and writes it to
-fixtures/conditions_snapshot.json. With STILLGO_OFFLINE=1 the API then serves
+fixtures/conditions_snapshot.json. With CLIMAP_OFFLINE=1 the API then serves
 entirely from that file -- no network, no surprises on stage.
 """
 import json

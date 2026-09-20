@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # The six fields the problem statement names for a person, and nothing more.
 RiskCategory = Literal[
@@ -121,11 +121,41 @@ class Citation(BaseModel):
     verified: str
 
 
+class Location(BaseModel):
+    """A real, geocoded place. Overrides the coordinates in places.json.
+
+    The lat/lon here is what actually gets sent to Open-Meteo, so the address on
+    screen and the coordinates in `requested_urls` are the same place. That is
+    the point: the address is verifiable, not decorative.
+    """
+    label: str          # what to show, e.g. "E 110th St & 2nd Ave"
+    lat: float
+    lon: float
+    zip_code: str = ""
+
+
 class CompareRequest(BaseModel):
-    profile_id: str
+    # Either a preset id or a profile built live in the UI. The inline one wins.
+    profile_id: Optional[str] = None
+    profile: Optional[Profile] = None
+    # When present, every option is evaluated at THIS place instead of the
+    # coordinates baked into places.json. Canopy still comes from the place --
+    # a street and a shaded path a block apart sit in the same weather grid
+    # cell, so tree cover is genuinely the thing that differs between them.
+    location: Optional[Location] = None
+    # Normally ids into places.json. When `options` is supplied the caller is
+    # building its own -- times taken from the user's calendar rather than the
+    # fixed slots in the data file -- and these are just the ids within it.
     option_ids: list[str] = Field(min_length=2, max_length=5)
+    options: Optional[list[PlanOption]] = None
     baseline_option_id: str
     focus_option_id: Optional[str] = None  # defaults to the lowest-strain option
+
+    @model_validator(mode="after")
+    def _one_of(self):
+        if not self.profile_id and not self.profile:
+            raise ValueError("Pass either profile_id or profile")
+        return self
 
 
 class CompareResponse(BaseModel):

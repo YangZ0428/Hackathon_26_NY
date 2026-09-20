@@ -38,7 +38,11 @@ CAL = {
     "CLO_GAIN": 2.5,        # degC-equivalent per clo above the pivot
     "CLO_PIVOT": 0.40,      # clo; light summer clothing
     "SCALE_MIN": 18.0,      # effective degC that maps to a score of 0
-    "SCALE_MAX": 55.0,      # effective degC that maps to a score of 100
+    # 64, not 55: the vulnerability multiplier is applied AFTER this
+    # normalization and reaches 1.40 (VULN_CAP), so the pre-multiplier score
+    # must top out near 71 or the most vulnerable profiles clamp at 100 and
+    # every option looks identical to them. 55 hid the canopy effect entirely.
+    "SCALE_MAX": 64.0,      # effective degC that maps to a score of 100
     "AGE_PIVOT": 60,        # vulnerability starts rising above this age
     "AGE_PER_YEAR": 0.008,
     "VULN_CAP": 0.40,       # vulnerability multiplier tops out at 1.40

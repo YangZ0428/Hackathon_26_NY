@@ -24,7 +24,7 @@ backend/fixtures/snapshot.json
 
 # --------------------------------------------------------------------------
 # Hackathon datasets shared under restricted terms. The problem statement asks
-# for an open-source deliverable, so none of these may be committed. StillGo
+# for an open-source deliverable, so none of these may be committed. Climap NYC
 # needs none of them -- it runs entirely on public, keyless endpoints.
 # --------------------------------------------------------------------------
 nyc2026-dataset*/

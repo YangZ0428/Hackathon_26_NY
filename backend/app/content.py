@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import weather
-from .schemas import PlanOption
+from .schemas import Location, PlanOption
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -28,7 +28,7 @@ PLACES = {p["id"]: p for p in _PLACES_DOC["places"]}
 SLOTS = {s["id"]: s for s in _PLACES_DOC["slots"]}
 
 
-def plan_options() -> list[PlanOption]:
+def plan_options(location: Location | None = None) -> list[PlanOption]:
     """Turn abstract options (place id x slot id) into real timestamps.
 
     Done at request time, not at import, so "today" and "tomorrow" stay correct
@@ -47,13 +47,22 @@ def plan_options() -> list[PlanOption]:
         place = PLACES[option["place"]]
         slot = SLOTS[option["slot"]]
         when = (hour_now + timedelta(days=slot["day_offset"])).replace(hour=slot["hour"])
+        # A geocoded address replaces the demo coordinates, so the weather really
+        # is that address's weather. Canopy stays with the place.
+        if location:
+            label = place.get("where_label_near", place["where_label"])
+            where_label = label.format(address=location.label)
+            lat, lon = location.lat, location.lon
+        else:
+            where_label, lat, lon = place["where_label"], place["lat"], place["lon"]
+
         out.append(PlanOption(
             id=option["id"],
             when_label=slot["when_label"],
             when_iso=when.isoformat(),
-            where_label=place["where_label"],
-            lat=place["lat"],
-            lon=place["lon"],
+            where_label=where_label,
+            lat=lat,
+            lon=lon,
             canopy_shade=place["canopy_shade"],
         ))
     return out
