@@ -91,8 +91,10 @@ function LoginPage() {
             className="mt-6 space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (isSignUp) navigate({ to: "/profile" });
-              else navigate({ to: "/week" });
+              // Sign in and sign up land in the same place: there are no real
+              // accounts behind this, and the profile form is what the app
+              // actually needs before it can score anything.
+              navigate({ to: "/profile" });
             }}
           >
             {isSignUp && (
@@ -100,7 +102,7 @@ function LoginPage() {
                 <Label htmlFor="name">Name</Label>
                 <div className="relative">
                   <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="name" placeholder="Maya Chen" className="h-11 pl-9" />
+                  <Input id="name" placeholder="Your name" className="h-11 pl-9" />
                 </div>
               </div>
             )}

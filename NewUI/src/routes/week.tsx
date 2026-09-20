@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, Leaf, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { fetchOptions } from "@/lib/api";
 
 export const Route = createFileRoute("/week")({
   head: () => ({
@@ -28,6 +30,26 @@ const week = [
   { day: "SAT", date: "26", tone: "good", note: "Favorable", events: [["10:00 AM", "Free"], ["7:00 PM", "Dinner"]] },
   { day: "SUN", date: "27", tone: "neutral", note: "May change", events: [["All day", "Free"]] },
 ] as const;
+
+/** The mock forecast above carries no dates of its own. Taking them from the
+ *  backend's pinned day keeps this page from claiming a different week than the
+ *  Day page shows -- "Sep 21-27" here and "Observed 2026-07-03" one click later
+ *  is the kind of mismatch that makes someone doubt the numbers that ARE real. */
+function weekAround(iso: string) {
+  const anchor = new Date(`${iso}T12:00:00`);
+  const monday = new Date(anchor);
+  monday.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + offset);
+    return {
+      label: date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+      date: String(date.getDate()),
+      iso: date.toISOString().slice(0, 10),
+      isAnchor: date.toISOString().slice(0, 10) === iso,
+    };
+  });
+}
 
 const suggestions = [
   {
@@ -61,6 +83,16 @@ const toneClasses: Record<ForecastTone, string> = {
 };
 
 function WeekPage() {
+  // Which day the API is pinned to. Only the backend knows (CLIMAP_DEMO_DATE),
+  // and the first plan option carries it.
+  const [anchorIso, setAnchorIso] = useState("");
+  useEffect(() => {
+    fetchOptions()
+      .then((options) => setAnchorIso(options[0]?.when_iso.slice(0, 10) ?? ""))
+      .catch(() => setAnchorIso(""));
+  }, []);
+  const days = anchorIso ? weekAround(anchorIso) : [];
+
   return (
     <div className="min-h-dvh bg-canvas text-foreground">
       <header className="border-b border-border bg-background">
@@ -76,7 +108,7 @@ function WeekPage() {
           </nav>
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <Button asChild variant="outline" size="sm" className="hidden rounded-lg shadow-none sm:inline-flex"><Link to="/login">Sign out</Link></Button>
-            <div className="hidden text-right sm:block"><p className="text-sm font-semibold">Maya</p><p className="text-xs text-muted-foreground">Chicago, IL</p></div>
+            <div className="hidden text-right sm:block"><p className="text-sm font-semibold">East Harlem</p><p className="text-xs text-muted-foreground">ZIP 10029 · New York</p></div>
             <Link to="/profile" className="grid size-9 place-items-center rounded-full bg-avatar text-sm font-bold text-avatar-foreground" aria-label="Your profile">MC</Link>
           </div>
         </div>
@@ -85,12 +117,24 @@ function WeekPage() {
       <main className="mx-auto max-w-[1400px] px-4 py-7 md:px-6 lg:px-8 lg:py-10">
         <div className="flex flex-col justify-between gap-5 border-b border-border pb-7 md:flex-row md:items-end">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary"><CalendarDays className="size-4" /> Sep 21 – Sep 27</div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary"><CalendarDays className="size-4" /> {days.length ? `${new Date(`${days[0]!.iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(`${days[6]!.iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "Loading the week…"}</div>
             <h1 className="text-3xl font-bold leading-tight md:text-4xl">Your week</h1>
             <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">This week looks good for outdoor activities. Wednesday afternoon may be better spent indoors.</p>
-            <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground"><span className="size-1.5 rounded-full bg-schedule" /> Based on current forecast</p>
+            {/* This page is entirely hardcoded -- see the arrays at the top of
+                the file. Saying "based on current forecast" here would be a
+                straight claim that it is live, which it is not. The Day page is
+                the one wired to real data. */}
+            <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground"><span className="size-1.5 rounded-full bg-schedule" /> Design preview — not yet connected to forecast data</p>
           </div>
           <Button variant="outline" size="sm" className="w-fit rounded-lg shadow-none"><RefreshCw /> Sync calendar</Button>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-border bg-secondary/50 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+          <strong className="font-semibold text-foreground">Pick a day to plan.</strong>{" "}
+          The highlighted day is the one we have loaded real observations for — open
+          it and every number is computed from them. The other six are a design
+          preview: extending the model across a week needs multi-day forecast
+          handling we have not built yet, so their indicators are placeholders.
         </div>
 
         <div className="mt-7 space-y-7">
@@ -101,14 +145,18 @@ function WeekPage() {
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-background shadow-panel">
               <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-7">
-                {week.map((day) => (
-                  <Link key={day.day} to="/" aria-label={`View ${day.day} ${day.date} on the Day page`} className="block transition-colors hover:bg-secondary/50 focus-visible:bg-secondary/50 focus-visible:outline-none">
+                {week.map((day, index) => {
+                  const calendar = days[index];
+                  return (
+                  <Link key={day.day} to="/" aria-label={`Open ${calendar?.label ?? day.day} ${calendar?.date ?? day.date} on the Day page`} className={`block transition-colors hover:bg-secondary/50 focus-visible:bg-secondary/50 focus-visible:outline-none ${calendar?.isAnchor ? "bg-good-soft/40" : ""}`}>
                     <article className="min-h-48 p-4 sm:min-h-52 xl:min-h-64">
                       <div className="flex items-start justify-between gap-2">
-                        <div><p className="text-xs font-bold text-muted-foreground">{day.day}</p><p className="mt-1 text-2xl font-bold">{day.date}</p></div>
+                        <div><p className="text-xs font-bold text-muted-foreground">{calendar?.label ?? day.day}</p><p className="mt-1 text-2xl font-bold">{calendar?.date ?? day.date}</p></div>
                         <span className={`mt-1 size-2.5 rounded-full ${toneClasses[day.tone]}`} aria-label={day.note} />
                       </div>
-                      <p className="mt-2 text-[11px] font-semibold text-muted-foreground">{day.note}</p>
+                      {calendar?.isAnchor
+                        ? <p className="mt-2 text-[11px] font-bold text-good-strong">Real observations</p>
+                        : <p className="mt-2 text-[11px] font-semibold text-muted-foreground">{day.note} · preview</p>}
                       <div className="mt-5 space-y-3">
                         {day.events.map(([time, title, warning]) => (
                           <div key={`${time}-${title}`} className={`rounded-lg border px-3 py-2.5 ${title === "Free" ? "border-good-border bg-good-soft" : "border-border bg-card"}`}>
@@ -119,7 +167,8 @@ function WeekPage() {
                       </div>
                     </article>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
